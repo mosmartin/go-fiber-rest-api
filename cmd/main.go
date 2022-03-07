@@ -27,6 +27,7 @@ func main() {
 
 	app.Get("/api/v1/healthcheck", healthCheck)
 	app.Post("/api/v1/products", handlers.CreateProduct)
+	app.Get("/api/v1/products", handlers.GetProducts)
 
 	// start server
 	log.Fatal(app.Listen(":" + port))

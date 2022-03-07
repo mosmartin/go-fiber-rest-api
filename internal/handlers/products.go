@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mosmartin/go-fiber-rest-api/internal/db"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -76,12 +77,29 @@ func CreateProduct(c *fiber.Ctx) error {
 	return c.JSON(product)
 }
 
-func GetAllProducts(c *fiber.Ctx) error {
+func GetProducts(c *fiber.Ctx) error {
 	var products []Product
 
-	// if err := db.Find(&products); err != nil {
-	// 	return c.Status(503).JSON(fiber.Map{"message": err.Error()})
-	// }
+	client, err := db.GetMongoClient()
+	if err != nil {
+		return err
+	}
+
+	collection := client.Database(os.Getenv("MONGO_DB")).Collection(string(db.ProductsCollection))
+
+	cursor, err := collection.Find(context.TODO(), bson.D{primitive.E{}})
+	if err != nil {
+		return err
+	}
+
+	for cursor.Next(context.TODO()) {
+		var product Product
+		if err := cursor.Decode(&product); err != nil {
+			return err
+		}
+
+		products = append(products, product)
+	}
 
 	return c.JSON(products)
 }
