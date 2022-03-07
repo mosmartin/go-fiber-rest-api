@@ -5,16 +5,45 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/mosmartin/go-fiber-rest-api/internal/db"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Product struct {
-	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
-	Title     string             `json:"title" bson:"title"`
-	CreatedAt time.Time          `json:"createdAt,omitempty" bson:"created_at,omitempty"`
-	UpdatedAt time.Time          `json:"updatedAt,omitempty" bson:"updated_at,omitempty"`
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty" validate:"required"`
+	Title     string             `json:"title" bson:"title" validate:"required,min=10,max=255"`
+	CreatedAt time.Time          `json:"createdAt,omitempty" bson:"created_at,omitempty" validate:"required"`
+	UpdatedAt time.Time          `json:"updatedAt,omitempty" bson:"updated_at,omitempty" validate:"required"`
+}
+
+type ErrorResponse struct {
+	Namespace       string
+	StructNamespace string
+	FieldField      string
+	Tag             string
+	Value           string
+}
+
+func ValidateProductStruct(p Product) []*ErrorResponse {
+	var errors []*ErrorResponse
+	validate := validator.New()
+	err := validate.Struct(p)
+
+	if err != nil {
+		for _, err := range err.(validator.ValidationErrors) {
+			errors = append(errors, &ErrorResponse{
+				Namespace:       err.Namespace(),
+				StructNamespace: err.StructNamespace(),
+				FieldField:      err.Field(),
+				Tag:             err.Tag(),
+				Value:           err.Param(),
+			})
+		}
+	}
+
+	return errors
 }
 
 func CreateProduct(c *fiber.Ctx) error {
@@ -26,6 +55,11 @@ func CreateProduct(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&product); err != nil {
 		return err
+	}
+
+	errors := ValidateProductStruct(product)
+	if errors != nil {
+		return c.Status(400).JSON(errors)
 	}
 
 	client, err := db.GetMongoClient()
